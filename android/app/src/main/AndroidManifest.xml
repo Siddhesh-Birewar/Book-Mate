@@ -1,8 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="book_mate"
+        android:label="Book Mate"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Disable Impeller on Android: it causes crashes on emulators (API 37) -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
