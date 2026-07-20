@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
@@ -45,7 +46,7 @@ class _BookCardState extends State<BookCard>
 
   Future<void> _loadThumbnail() async {
     try {
-      final document = await PdfDocument.openFile(widget.book.path);
+      final document = await PdfDocument.openData(File(widget.book.path).readAsBytesSync());
       final page = await document.getPage(1);
       final pageImage = await page.render(
         width: page.width * 2,

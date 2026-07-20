@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -58,7 +59,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   Future<void> _loadDocument() async {
     try {
-      final doc = await PdfDocument.openFile(widget.book.path);
+      final doc = await PdfDocument.openData(File(widget.book.path).readAsBytesSync());
       if (!mounted) return;
       setState(() {
         _document = doc;
