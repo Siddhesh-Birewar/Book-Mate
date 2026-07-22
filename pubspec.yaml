@@ -37,7 +37,10 @@ dependencies:
   provider: ^6.1.5+1
   file_picker: ^11.0.2
   pdfx: ^2.9.2
-  flutter_pdf_flipbook: ^1.0.0
+  turnable_page: ^1.0.1
+  pdfrx: 2.3.0
+  path_provider: ^2.1.5
+  shared_preferences: ^2.5.3
   path: ^1.9.1
 
 dev_dependencies:

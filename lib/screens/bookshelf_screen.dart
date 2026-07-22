@@ -32,8 +32,8 @@ class BookshelfScreen extends StatelessWidget {
               Icons.auto_stories_rounded,
               size: 24,
               color: isDark
-                  ? const Color(0xFF9B85FF)
-                  : const Color(0xFF6B4EFF),
+                  ? const Color(0xFFD4AF37)
+                  : const Color(0xFFB8941F),
             ),
             const SizedBox(width: 10),
             const Text('Book Mate'),
@@ -44,12 +44,20 @@ class BookshelfScreen extends StatelessWidget {
           SizedBox(width: 4),
         ],
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        child: bookshelf.isEmpty
-            ? const EmptyBookshelf()
-            : _BookGrid(books: bookshelf.books),
-      ),
+      body: bookshelf.isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: isDark
+                    ? const Color(0xFFD4AF37)
+                    : const Color(0xFFB8941F),
+              ),
+            )
+          : AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: bookshelf.isEmpty
+                  ? const EmptyBookshelf()
+                  : _BookGrid(books: bookshelf.books),
+            ),
       floatingActionButton: _ImportFab(isDark: isDark),
     );
   }
@@ -116,7 +124,7 @@ class _BookGrid extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark
-            ? const Color(0xFF1A1A2E)
+            ? const Color(0xFF141414)
             : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -126,16 +134,16 @@ class _BookGrid extends StatelessWidget {
           style: TextStyle(
             fontWeight: FontWeight.w700,
             color: isDark
-                ? const Color(0xFFE8E4F0)
-                : const Color(0xFF1A1A2E),
+                ? const Color(0xFFE5E0D8)
+                : const Color(0xFF1A1A1A),
           ),
         ),
         content: Text(
-          'Remove "${book.name}" from your bookshelf?',
+          'Remove "${book.name}" from your bookshelf?\nThe local copy will also be deleted.',
           style: TextStyle(
             color: isDark
-                ? const Color(0xFF8A8198)
-                : const Color(0xFF6E6B7B),
+                ? const Color(0xFF8A8178)
+                : const Color(0xFF6E6860),
           ),
         ),
         actions: [
@@ -145,8 +153,8 @@ class _BookGrid extends StatelessWidget {
               'Cancel',
               style: TextStyle(
                 color: isDark
-                    ? const Color(0xFF9B85FF)
-                    : const Color(0xFF6B4EFF),
+                    ? const Color(0xFFD4AF37)
+                    : const Color(0xFFB8941F),
               ),
             ),
           ),
@@ -183,12 +191,12 @@ class _ImportFab extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isDark
-              ? [const Color(0xFF9B85FF), const Color(0xFF6B4EFF)]
-              : [const Color(0xFF6B4EFF), const Color(0xFF4B2EDF)],
+              ? [const Color(0xFFD4AF37), const Color(0xFFB8941F)]
+              : [const Color(0xFFB8941F), const Color(0xFF9A7F28)],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6B4EFF).withValues(alpha: 0.4),
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -212,7 +220,8 @@ class _ImportFab extends StatelessWidget {
         },
         elevation: 0,
         backgroundColor: Colors.transparent,
-        child: const Icon(Icons.add_rounded, size: 28),
+        child: Icon(Icons.add_rounded, size: 28,
+            color: isDark ? const Color(0xFF0A0A0A) : Colors.white),
       ),
     );
   }

@@ -1,22 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages the application's theme state (light/dark mode)
 /// and the PDF color inversion toggle for dark mode reading.
+///
+/// Persists theme preference to SharedPreferences.
 class ThemeProvider extends ChangeNotifier {
-  bool _isDarkMode = false;
-  bool _invertColors = false;
+  static const String _themeKey = 'bookmate_dark_mode';
+
+  bool _isDarkMode = true; // Default to dark for OLED experience
+  bool _invertColors = true;
+
+  ThemeProvider() {
+    _loadPreference();
+  }
 
   bool get isDarkMode => _isDarkMode;
   bool get invertColors => _invertColors;
 
-  /// The active [ThemeData], built from curated color palettes
-  /// for a premium reading experience.
+  /// The active [ThemeData], built from curated OLED-optimized palettes.
   ThemeData get theme => _isDarkMode ? _darkTheme : _lightTheme;
+
+  Future<void> _loadPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getBool(_themeKey);
+    if (saved != null) {
+      _isDarkMode = saved;
+      _invertColors = saved;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _savePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_themeKey, _isDarkMode);
+  }
 
   void toggleTheme() {
     _isDarkMode = !_isDarkMode;
     // Auto-enable color inversion when switching to dark mode
     _invertColors = _isDarkMode;
+    _savePreference();
     notifyListeners();
   }
 
@@ -26,14 +50,14 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   // ──────────────────────────────────────────────
-  // Premium Light Theme
+  // Warm Light Theme
   // ──────────────────────────────────────────────
 
   static final ThemeData _lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorSchemeSeed: const Color(0xFF6B4EFF),
-    scaffoldBackgroundColor: const Color(0xFFF8F6FF),
+    colorSchemeSeed: const Color(0xFFD4AF37),
+    scaffoldBackgroundColor: const Color(0xFFFAF8F5),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -42,13 +66,13 @@ class ThemeProvider extends ChangeNotifier {
         fontFamily: 'SF Pro Display',
         fontSize: 22,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF1A1A2E),
+        color: Color(0xFF1A1A1A),
         letterSpacing: -0.5,
       ),
-      iconTheme: IconThemeData(color: Color(0xFF6B4EFF)),
+      iconTheme: IconThemeData(color: Color(0xFFB8941F)),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: Color(0xFF6B4EFF),
+      backgroundColor: Color(0xFFD4AF37),
       foregroundColor: Colors.white,
       elevation: 8,
       shape: CircleBorder(),
@@ -64,14 +88,14 @@ class ThemeProvider extends ChangeNotifier {
   );
 
   // ──────────────────────────────────────────────
-  // Premium Dark Theme
+  // OLED Dark Theme — True Black + Gold Accent
   // ──────────────────────────────────────────────
 
   static final ThemeData _darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    colorSchemeSeed: const Color(0xFF9B85FF),
-    scaffoldBackgroundColor: const Color(0xFF0D0D1A),
+    colorSchemeSeed: const Color(0xFFD4AF37),
+    scaffoldBackgroundColor: const Color(0xFF0A0A0A),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -80,14 +104,14 @@ class ThemeProvider extends ChangeNotifier {
         fontFamily: 'SF Pro Display',
         fontSize: 22,
         fontWeight: FontWeight.w700,
-        color: Color(0xFFE8E4F0),
+        color: Color(0xFFE5E0D8),
         letterSpacing: -0.5,
       ),
-      iconTheme: IconThemeData(color: Color(0xFF9B85FF)),
+      iconTheme: IconThemeData(color: Color(0xFFD4AF37)),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: Color(0xFF9B85FF),
-      foregroundColor: Colors.white,
+      backgroundColor: Color(0xFFD4AF37),
+      foregroundColor: Color(0xFF0A0A0A),
       elevation: 8,
       shape: CircleBorder(),
     ),
@@ -96,7 +120,7 @@ class ThemeProvider extends ChangeNotifier {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      color: const Color(0xFF1A1A2E),
+      color: const Color(0xFF141414),
       surfaceTintColor: Colors.transparent,
     ),
   );

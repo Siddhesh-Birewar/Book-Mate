@@ -4,11 +4,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pdfx/pdfx.dart';
+import 'package:turnable_page/turnable_page.dart';
 import '../models/book.dart';
 import '../providers/theme_provider.dart';
+import '../providers/bookshelf_provider.dart';
 import '../utils/color_inversion.dart';
 
-/// The PDF reader screen with page-flip animation and dark mode color inversion.
+/// The PDF reader screen with page-flip animation, dark mode color inversion,
+/// and an ergonomic reading HUD.
 ///
 /// Architecture (per TRD §2.2):
 /// - **PDF Controller**: Opens the document via `pdfx` and renders pages
@@ -35,16 +38,25 @@ class _ReaderScreenState extends State<ReaderScreen>
   final Map<int, Uint8List> _pageCache = {};
 
   // Page flip animation
-  late PageController _pageController;
+  late PageFlipController _flipController;
   late AnimationController _overlayFadeController;
   late Animation<double> _overlayFadeAnimation;
 
   bool _showOverlay = true;
 
+  // ─── OLED Theme Colors ───
+  static const _oledBlack = Color(0xFF0A0A0A);
+  static const _surfaceDark = Color(0xFF141414);
+  static const _textPrimary = Color(0xFFE5E0D8);
+  static const _textSecondary = Color(0xFF8A8178);
+  static const _accentGold = Color(0xFFD4AF37);
+  static const _accentGoldDim = Color(0xFF9A7F28);
+
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
+    _currentPage = widget.book.lastReadPage;
+    _flipController = PageFlipController();
     _overlayFadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -59,15 +71,27 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   Future<void> _loadDocument() async {
     try {
-      final doc = await PdfDocument.openData(File(widget.book.path).readAsBytesSync());
+      final doc = await PdfDocument.openData(
+        File(widget.book.localPath).readAsBytesSync(),
+      );
       if (!mounted) return;
       setState(() {
         _document = doc;
         _totalPages = doc.pagesCount;
         _isLoading = false;
       });
-      // Pre-render first 3 pages
-      for (int i = 0; i < math.min(3, _totalPages); i++) {
+
+      // Update total pages in persistent storage if needed
+      if (widget.book.totalPages != _totalPages) {
+        context
+            .read<BookshelfProvider>()
+            .updateTotalPages(widget.book.localPath, _totalPages);
+      }
+
+      // Pre-render pages around the starting position
+      final start = math.max(0, _currentPage - 1);
+      final end = math.min(_totalPages, _currentPage + 3);
+      for (int i = start; i < end; i++) {
         _renderPage(i);
       }
     } catch (e) {
@@ -99,11 +123,17 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
   }
 
-  void _onPageChanged(int page) {
-    setState(() => _currentPage = page);
+  void _onPageChanged(int leftPage, int rightPage) {
+    setState(() => _currentPage = leftPage);
+
+    // Save reading progress persistently
+    context
+        .read<BookshelfProvider>()
+        .updateReadingProgress(widget.book.localPath, leftPage);
+
     // Pre-render surrounding pages
-    for (int i = math.max(0, page - 1);
-        i < math.min(_totalPages, page + 3);
+    for (int i = math.max(0, leftPage - 1);
+        i < math.min(_totalPages, leftPage + 3);
         i++) {
       _renderPage(i);
     }
@@ -120,7 +150,10 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   void dispose() {
-    _pageController.dispose();
+    // Save final reading position
+    context
+        .read<BookshelfProvider>()
+        .updateReadingProgress(widget.book.localPath, _currentPage);
     _overlayFadeController.dispose();
     _document?.close();
     super.dispose();
@@ -133,7 +166,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     final shouldInvert = themeProvider.invertColors;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0A14) : const Color(0xFFF5F3FA),
+      backgroundColor: isDark ? _oledBlack : const Color(0xFFFAF8F5),
       body: _isLoading
           ? _buildLoadingState(isDark)
           : _errorMessage != null
@@ -156,9 +189,7 @@ class _ReaderScreenState extends State<ReaderScreen>
             height: 48,
             child: CircularProgressIndicator(
               strokeWidth: 3,
-              color: isDark
-                  ? const Color(0xFF9B85FF)
-                  : const Color(0xFF6B4EFF),
+              color: isDark ? _accentGold : _accentGoldDim,
             ),
           ),
           const SizedBox(height: 20),
@@ -166,9 +197,7 @@ class _ReaderScreenState extends State<ReaderScreen>
             'Opening ${widget.book.name}…',
             style: TextStyle(
               fontSize: 16,
-              color: isDark
-                  ? const Color(0xFF8A8198)
-                  : const Color(0xFF6E6B7B),
+              color: isDark ? _textSecondary : const Color(0xFF6E6860),
             ),
           ),
         ],
@@ -198,9 +227,7 @@ class _ReaderScreenState extends State<ReaderScreen>
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: isDark
-                    ? const Color(0xFFE8E4F0)
-                    : const Color(0xFF1A1A2E),
+                color: isDark ? _textPrimary : const Color(0xFF1A1A1A),
               ),
             ),
             const SizedBox(height: 8),
@@ -209,16 +236,17 @@ class _ReaderScreenState extends State<ReaderScreen>
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: isDark
-                    ? const Color(0xFF8A8198)
-                    : const Color(0xFF6E6B7B),
+                color: isDark ? _textSecondary : const Color(0xFF6E6860),
               ),
             ),
             const SizedBox(height: 24),
             TextButton.icon(
               onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_rounded),
-              label: const Text('Go Back'),
+              icon: Icon(Icons.arrow_back_rounded,
+                  color: isDark ? _accentGold : _accentGoldDim),
+              label: Text('Go Back',
+                  style: TextStyle(
+                      color: isDark ? _accentGold : _accentGoldDim)),
             ),
           ],
         ),
@@ -245,22 +273,35 @@ class _ReaderScreenState extends State<ReaderScreen>
           child: _buildTopBar(isDark),
         ),
 
-        // Bottom overlay: page indicator + controls
+        // Bottom overlay: ergonomic reading HUD
         FadeTransition(
           opacity: _overlayFadeAnimation,
-          child: _buildBottomBar(isDark),
+          child: _buildBottomHUD(isDark),
         ),
       ],
     );
   }
 
   Widget _buildPageView(bool isDark, bool shouldInvert) {
-    Widget pageView = PageView.builder(
-      controller: _pageController,
-      itemCount: _totalPages,
+    Widget pageView = TurnablePage(
+      controller: _flipController,
+      pageCount: _totalPages,
       onPageChanged: _onPageChanged,
-      physics: const BouncingScrollPhysics(),
-      itemBuilder: (context, index) {
+      pageViewMode: PageViewMode.single,
+      autoResponseSize: true,
+      settings: FlipSettings(
+        startPageIndex: widget.book.lastReadPage,
+        flippingTime: 600,
+        swipeDistance: 60.0,
+        drawShadow: true,
+        maxShadowOpacity: isDark ? 0.7 : 0.4,
+        usePortrait: true,
+        mobileScrollSupport: true,
+        showPageCorners: true,
+        enableEasing: true,
+        enableInertia: true,
+      ),
+      builder: (context, index, constraints) {
         return _buildPage(index, isDark);
       },
     );
@@ -282,44 +323,30 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (bytes == null) {
       // Page not yet rendered — show loading placeholder
       _renderPage(index);
-      return Center(
-        child: SizedBox(
-          width: 32,
-          height: 32,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            color: isDark
-                ? const Color(0xFF9B85FF)
-                : const Color(0xFF6B4EFF),
+      return Container(
+        color: isDark ? _oledBlack : Colors.white,
+        child: Center(
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: isDark ? _accentGold : _accentGoldDim,
+            ),
           ),
         ),
       );
     }
 
-    return InteractiveViewer(
-      minScale: 1.0,
-      maxScale: 4.0,
+    return Container(
+      color: isDark ? _oledBlack : Colors.white,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
-                  blurRadius: 24,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.contain,
-                gaplessPlayback: true,
-              ),
-            ),
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
           ),
         ),
       ),
@@ -339,8 +366,8 @@ class _ReaderScreenState extends State<ReaderScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              (isDark ? Colors.black : Colors.white).withValues(alpha: 0.9),
-              (isDark ? Colors.black : Colors.white).withValues(alpha: 0.0),
+              (isDark ? _oledBlack : Colors.white).withValues(alpha: 0.95),
+              (isDark ? _oledBlack : Colors.white).withValues(alpha: 0.0),
             ],
           ),
         ),
@@ -355,9 +382,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                   onPressed: () => Navigator.of(context).pop(),
                   icon: Icon(
                     Icons.arrow_back_rounded,
-                    color: isDark
-                        ? const Color(0xFF9B85FF)
-                        : const Color(0xFF6B4EFF),
+                    color: isDark ? _accentGold : _accentGoldDim,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -369,9 +394,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? const Color(0xFFE8E4F0)
-                          : const Color(0xFF1A1A2E),
+                      color: isDark ? _textPrimary : const Color(0xFF1A1A1A),
                     ),
                   ),
                 ),
@@ -383,9 +406,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       tp.invertColors
                           ? Icons.invert_colors_rounded
                           : Icons.invert_colors_off_rounded,
-                      color: isDark
-                          ? const Color(0xFF9B85FF)
-                          : const Color(0xFF6B4EFF),
+                      color: isDark ? _accentGold : _accentGoldDim,
                     ),
                     tooltip: tp.invertColors
                         ? 'Disable color inversion'
@@ -401,10 +422,16 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   // ──────────────────────────────────────────────
-  // Bottom Bar Overlay
+  // Bottom HUD — Ergonomic Reading Progress Bar
   // ──────────────────────────────────────────────
 
-  Widget _buildBottomBar(bool isDark) {
+  Widget _buildBottomHUD(bool isDark) {
+    final pagesLeft = _totalPages - _currentPage - 1;
+    final progressPercent =
+        _totalPages > 0 ? ((_currentPage + 1) / _totalPages * 100) : 0.0;
+    final progressFraction =
+        _totalPages > 0 ? (_currentPage + 1) / _totalPages : 0.0;
+
     return IgnorePointer(
       ignoring: !_showOverlay,
       child: Align(
@@ -415,33 +442,81 @@ class _ReaderScreenState extends State<ReaderScreen>
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
               colors: [
-                (isDark ? Colors.black : Colors.white).withValues(alpha: 0.9),
-                (isDark ? Colors.black : Colors.white).withValues(alpha: 0.0),
+                (isDark ? _oledBlack : Colors.white).withValues(alpha: 0.95),
+                (isDark ? _oledBlack : Colors.white).withValues(alpha: 0.0),
               ],
             ),
           ),
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Page slider
+                  // ── Reading stats row ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '$pagesLeft page${pagesLeft == 1 ? '' : 's'} left',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? _textSecondary
+                                : const Color(0xFF8A8178),
+                          ),
+                        ),
+                        Text(
+                          '${progressPercent.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? _accentGold : _accentGoldDim,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ── Animated progress bar ──
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: progressFraction),
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
+                      builder: (context, value, _) {
+                        return LinearProgressIndicator(
+                          value: value,
+                          minHeight: 4,
+                          backgroundColor: isDark
+                              ? const Color(0xFF1E1E1E)
+                              : const Color(0xFFE8E4DC),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            isDark ? _accentGold : _accentGoldDim,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Page slider ──
                   if (_totalPages > 1)
                     SliderTheme(
                       data: SliderThemeData(
-                        activeTrackColor: isDark
-                            ? const Color(0xFF9B85FF)
-                            : const Color(0xFF6B4EFF),
+                        activeTrackColor:
+                            isDark ? _accentGold : _accentGoldDim,
                         inactiveTrackColor: isDark
-                            ? const Color(0xFF2A2A3E)
-                            : const Color(0xFFE0DCEF),
-                        thumbColor: isDark
-                            ? const Color(0xFF9B85FF)
-                            : const Color(0xFF6B4EFF),
-                        overlayColor: const Color(0xFF6B4EFF)
-                            .withValues(alpha: 0.15),
+                            ? const Color(0xFF1E1E1E)
+                            : const Color(0xFFE8E4DC),
+                        thumbColor: isDark ? _accentGold : _accentGoldDim,
+                        overlayColor: _accentGold.withValues(alpha: 0.15),
                         trackHeight: 3,
                         thumbShape: const RoundSliderThumbShape(
                           enabledThumbRadius: 7,
@@ -453,23 +528,26 @@ class _ReaderScreenState extends State<ReaderScreen>
                         max: (_totalPages - 1).toDouble(),
                         onChanged: (value) {
                           final page = value.round();
-                          _pageController.jumpToPage(page);
+                          _flipController.goToPage(page);
                         },
                       ),
                     ),
                   const SizedBox(height: 4),
 
-                  // Page counter
+                  // ── Page counter pill ──
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1A1A2E)
-                          : Colors.white,
+                      color: isDark ? _surfaceDark : Colors.white,
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isDark
+                            ? _accentGold.withValues(alpha: 0.2)
+                            : _accentGoldDim.withValues(alpha: 0.2),
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.08),
@@ -483,9 +561,7 @@ class _ReaderScreenState extends State<ReaderScreen>
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFCCC4E0)
-                            : const Color(0xFF4A4660),
+                        color: isDark ? _textPrimary : const Color(0xFF3A3630),
                         letterSpacing: 0.3,
                       ),
                     ),

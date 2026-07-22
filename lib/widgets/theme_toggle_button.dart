@@ -55,8 +55,8 @@ class _ThemeToggleButtonState extends State<ThemeToggleButton>
             isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             key: ValueKey(isDark),
             color: isDark
-                ? const Color(0xFFFFD54F)
-                : const Color(0xFF6B4EFF),
+                ? const Color(0xFFD4AF37)
+                : const Color(0xFFB8941F),
           ),
         ),
       ),

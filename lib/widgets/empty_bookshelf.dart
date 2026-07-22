@@ -25,12 +25,12 @@ class EmptyBookshelf extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: isDark
                       ? [
-                          const Color(0xFF1A1A3E),
-                          const Color(0xFF2A1A4E),
+                          const Color(0xFF1A1A0A),
+                          const Color(0xFF2A2010),
                         ]
                       : [
-                          const Color(0xFFF0EDFF),
-                          const Color(0xFFE8E0FF),
+                          const Color(0xFFFAF5E8),
+                          const Color(0xFFF0E8D0),
                         ],
                 ),
               ),
@@ -38,8 +38,8 @@ class EmptyBookshelf extends StatelessWidget {
                 Icons.menu_book_rounded,
                 size: 52,
                 color: isDark
-                    ? const Color(0xFF9B85FF)
-                    : const Color(0xFF6B4EFF),
+                    ? const Color(0xFFD4AF37)
+                    : const Color(0xFFB8941F),
               ),
             ),
 
@@ -51,8 +51,8 @@ class EmptyBookshelf extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: isDark
-                    ? const Color(0xFFE8E4F0)
-                    : const Color(0xFF1A1A2E),
+                    ? const Color(0xFFE5E0D8)
+                    : const Color(0xFF1A1A1A),
                 letterSpacing: -0.5,
               ),
             ),
@@ -66,8 +66,8 @@ class EmptyBookshelf extends StatelessWidget {
                 fontSize: 15,
                 fontWeight: FontWeight.w400,
                 color: isDark
-                    ? const Color(0xFF8A8198)
-                    : const Color(0xFF6E6B7B),
+                    ? const Color(0xFF8A8178)
+                    : const Color(0xFF6E6860),
                 height: 1.5,
               ),
             ),
